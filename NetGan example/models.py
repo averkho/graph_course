@@ -90,7 +90,18 @@ class Generator(nn.Module):
         return -torch.log(-torch.log(U + eps) + eps)
     
     def gumbel_softmax_sample(self, logits, temperature, device, hard=True) -> torch.Tensor:
+        gumbel = self.sample_gumbel(logits).type(torch.float64).to(device)
+        y = logits + gumbel
+        y = torch.nn.functional.softmax(y / temperature, dim=1)
+        if hard:
+            y_hard = torch.max(y, 1, keepdim=True)[0].eq(y).type(torch.float64).to(device)
+            y = (y_hard - y).detach() + y
         
+        return y
+    
+    def init_hidden(self, batch_size) -> torch.Tensor:
+        weight = next(self.parameters()).data
+        return weight.new(batch_size, self.H_inputs).zero_().type(torch.float64)
             
             
             
