@@ -77,6 +77,55 @@ class Trainer():
             Seed for numpy.random. It is used for splitting the graph in train, validation and test set
         """
         
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.max_iterations = max_iterations
+        self.rw_len = rw_len
+        self.batch_size = batch_size
+        self.N = N
+        self.generator = Generator(H_inputs=H_inp, H=H_gen, z_dim=z_dim, N=N, rw_len=rw_len, temp=temp_start).to(self.device)
+        self.discriminator = Discriminator(H_inputs=H_inp, H=H_gen, N=N, rw_len=rw_len).to(self.device)
+        self.G_optimizer = optim.Adam(self.generator.parameters(), lr=lr, betas=betas)
+        self.D_optimizer = optim.Adam(self.discriminator.parameters(), lr=lr, betas=betas)
+        self.n_critic = n_critic
+        self.gp_weight = gp_weight
+        self.l2_penalty_disc = l2_penalty_disc
+        self.l2_penalty_gen = l2_penalty_gen
+        self.temp_start = temp_start
+        self.temp_decay = temp_decay
+        self.min_temp = min_temp
+        
+        self.graph = graph
+        self.train_ones, self.val_onces, self.val_zeros, self.test_ones, self.test_zeros = utils.train_val_test_split_adjacency(graph, val_share, test_share, seed, undirected=True, connected=True, asserts=True, set_ops=set_ops)
+        self.train_graph = sp.coo_matrix((np.ones(len(self.train_ones)), 
+                                          (self.train_ones[:, 0], self.train_ones[:, 1]))).tocsr()
+        assert(self.train_graph.toarray() == self.train_graph.toarray().T).all()
+        self.walker = utils.RandomWalker(self.train_graph, rw_len, p=1, q=1, batch_size=batch_size)
+        self.eo = []
+        self.critic_loss = []
+        self.generator_loss = []
+        self.avp = []
+        self.roc_auc = []
+        self.best_performance = 0.0
+        self.running = True
+        
+    def l2_regularization_G(self, G):
+        l2_1 = torch.sum(torch.cat([x.view(-1) for x in G.W_down.weight]) **2 / 2)
+        l2_2 = torch.sum(torch.cat([x.view(-1) for x in G.W_up.weight]) **2 / 2)
+        l2_3 = torch.sum(torch.cat([x.view(-1) for x in G.W_up.bias]) **2 / 2)
+        l2_4 = torch.sum(torch.cat([x.view(-1) for x in G.intermediate.weight]) **2 / 2)
+        l2_5 = torch.sum(torch.cat([x.view(-1) for x in G.intermediate.bias]) **2 / 2)
+        l2_6 = torch.sum(torch.cat([x.view(-1) for x in G.h_up.weight]) **2 / 2)
+        l2_7 = torch.sum(torch.cat([x.view(-1) for x in G.h_up.bias]) **2 / 2)
+        l2_8 = torch.sum(torch.cat([x.view(-1) for x in G.c_up.weight]) **2 / 2)
+        l2_9 = torch.sum(torch.cat([x.view(-1) for x in G.c_up.bias]) **2 / 2)
+        l2_10 = torch.sum(torch.cat([x.view(-1) for x in G.lstmcell.cell.weight]) **2 / 2)
+        l2_11 = torch.sum(torch.cat([x.view(-1) for x in G.lstmcell.cell.bias]) **2 / 2)
+        
+        l2 = self.l2_penalty_gen * (l2_1 + l2_2 + l2_3 + l2_4 + l2_5 + l2_6 + l2_7 + l2_8 + l2_9 + l2_10 
+                                    + l2_11)
+        
+        return l2
+        
         
         
         
