@@ -126,6 +126,18 @@ class Trainer():
         
         return l2
         
+    def l2_regularization_D(self, D):
+        
+        l2_1 = torch.sum(torch.cat([x.view(-1) for x in D.W_down.weight]) **2 / 2)
+        l2_2 = torch.sum(torch.cat([x.view(-1) for x in D.lstmcell.cell.weight]) **2 / 2)
+        l2_3 = torch.sum(torch.cat([x.view(-1) for x in D.lstmcell.cell.bias]) **2 / 2)
+        l2_4 = torch.sum(torch.cat([x.view(-1) for x in D.lin_out.weight]) **2 / 2)
+        l2_5 = torch.sum(torch.cat([x.view(-1) for x in D.lstmcell.cell.bias]) **2 / 2)
+        l2 = self.l2_penalty_disc * (l2_1 + l2_2 + l2_3 + l2_4 + l2_5)
+        
+        return l2
+    
+    
         
         
         
